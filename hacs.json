@@ -1,0 +1,7 @@
+{
+  "name": "Spotify Premium Card",
+  "content_in_root": false,
+  "filename": "spotify-premium-card.js",
+  "render_readme": true,
+  "homeassistant": ">=2025.1.0"
+}
