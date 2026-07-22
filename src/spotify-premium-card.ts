@@ -231,4 +231,46 @@ export class SpotifyPremiumCard extends LitElement {
     .icon-button {
       width: 44px;
       height: 44px;
-      
+      font-size: 20px;
+      border-radius: 50%;
+    }
+
+    .icon-button:hover {
+      color: #d7d7d7;
+      transform: scale(1.06);
+    }
+
+    .center-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      grid-column: 2;
+    }
+
+    .play-button {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #111111;
+      font-size: 24px;
+      font-weight: 700;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .play-button:hover {
+      transform: scale(1.05);
+    }
+
+    .error {
+      padding: 16px;
+      color: #fff;
+    }
+  `;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'spotify-premium-card': SpotifyPremiumCard;
+  }
+}
