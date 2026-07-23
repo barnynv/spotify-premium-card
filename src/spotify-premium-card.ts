@@ -396,6 +396,19 @@ export class SpotifyPremiumCard extends LitElement {
                 : nothing}
             </div>
 
+            <div class="footer">
+              <span>Created by Barny_II</span>
+            
+              <a
+                href="https://revolut.me/ricardspw1"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click=${(event: Event) => event.stopPropagation()}
+              >
+                Support the project
+              </a>
+            </div>
+
             <button
               class=${`icon-button ${
                 isShuffleActive ? 'is-active' : ''
@@ -725,6 +738,34 @@ export class SpotifyPremiumCard extends LitElement {
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 2px;
+      color: rgba(255, 255, 255, 0.42);
+      font-size: 10px;
+      letter-spacing: 0.01em;
+    }
+    
+    .footer a {
+      color: rgba(255, 255, 255, 0.62);
+      font-weight: 600;
+      text-decoration: none;
+      transition: color 180ms ease;
+    }
+    
+    .footer a:hover {
+      color: #1db954;
+    }
+    
+    .footer a:focus-visible {
+      outline: 2px solid #1db954;
+      outline-offset: 3px;
+      border-radius: 4px;
     }
 
     .error {
