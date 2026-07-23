@@ -305,12 +305,12 @@ export class SpotifyPremiumCard extends LitElement {
     }
 
     .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px 10px;
+      display: flex;
+      width: 100%;
       align-items: center;
-      justify-items: center;
-      padding-top: 4px;
+      justify-content: space-between;
+      gap: 4px;
+      padding-top: 8px;
     }
 
     .icon-button,
@@ -326,11 +326,13 @@ export class SpotifyPremiumCard extends LitElement {
     }
 
     .icon-button {
-      width: 44px;
-      height: 44px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       background: transparent;
       color: #9f9f9f;
+      flex: 1 1 0;
+      min-width: 40px;
     }
 
     .icon-button:hover {
@@ -345,9 +347,9 @@ export class SpotifyPremiumCard extends LitElement {
 
     .center-wrap {
       display: flex;
-      grid-column: 2;
       align-items: center;
       justify-content: center;
+      margin-inline: 4px;
     }
 
     .play-button {
@@ -357,6 +359,7 @@ export class SpotifyPremiumCard extends LitElement {
       background: #fff;
       color: #111;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+      flex: 0 0 auto;
     }
 
     .play-button:hover {
