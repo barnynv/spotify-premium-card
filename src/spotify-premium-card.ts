@@ -81,24 +81,63 @@ export class SpotifyPremiumCard extends LitElement {
           </div>
 
           <div class="controls-grid">
-            <button class="icon-button" @click=${() => this._callMedia('volume_down')} aria-label="Volume down">🔈</button>
-            <button class="icon-button" @click=${() => this._callMedia('shuffle_set')} aria-label="Shuffle">🔀</button>
-            <button class="icon-button" @click=${() => this._callMedia('media_previous_track')} aria-label="Previous">⏮</button>
-
-            <div class="center-wrap">
-              <button
-                class="play-button"
-                @click=${() => this._callMedia(isPlaying ? 'media_pause' : 'media_play')}
-                aria-label=${isPlaying ? 'Pause' : 'Play'}
-              >
-                ${isPlaying ? '❚❚' : '▶'}
-              </button>
-            </div>
-
-            <button class="icon-button" @click=${() => this._callMedia('media_next_track')} aria-label="Next">⏭</button>
-            <button class="icon-button" @click=${() => this._callMedia('repeat_set')} aria-label="Repeat">🔁</button>
-            <button class="icon-button" @click=${() => this._callMedia('media_stop')} aria-label="Device">📺</button>
+          <button
+            class="icon-button"
+            @click=${() => this._callMedia('volume_down')}
+            aria-label="Bajar volumen"
+          >
+            <ha-icon icon="mdi:volume-medium"></ha-icon>
+          </button>
+        
+          <button
+            class="icon-button"
+            @click=${() => this._callMedia('shuffle_set')}
+            aria-label="Shuffle"
+          >
+            <ha-icon icon="mdi:shuffle"></ha-icon>
+          </button>
+        
+          <button
+            class="icon-button"
+            @click=${() => this._callMedia('media_previous_track')}
+            aria-label="Canción anterior"
+          >
+            <ha-icon icon="mdi:skip-previous"></ha-icon>
+          </button>
+        
+          <div class="center-wrap">
+            <button
+              class="play-button"
+              @click=${() => this._callMedia(isPlaying ? 'media_pause' : 'media_play')}
+              aria-label=${isPlaying ? 'Pausar' : 'Reproducir'}
+            >
+              <ha-icon icon=${isPlaying ? 'mdi:pause' : 'mdi:play'}></ha-icon>
+            </button>
           </div>
+        
+          <button
+            class="icon-button"
+            @click=${() => this._callMedia('media_next_track')}
+            aria-label="Canción siguiente"
+          >
+            <ha-icon icon="mdi:skip-next"></ha-icon>
+          </button>
+        
+          <button
+            class="icon-button"
+            @click=${() => this._callMedia('repeat_set')}
+            aria-label="Repetir"
+          >
+            <ha-icon icon="mdi:repeat"></ha-icon>
+          </button>
+        
+          <button
+            class="icon-button"
+            aria-label="Dispositivo de reproducción"
+          >
+            <ha-icon icon="mdi:cast"></ha-icon>
+          </button>
+        </div>
         </div>
       </ha-card>
     `;
@@ -115,8 +154,20 @@ export class SpotifyPremiumCard extends LitElement {
       background: #121212;
       color: #fff;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+      width: 22px;
+      height: 22px;
+      --mdc-icon-size: 22px;
     }
-
+    .play-button ha-icon {
+      width: 30px;
+      height: 30px;
+      --mdc-icon-size: 30px;
+    }
+    
+    .play-button ha-icon[icon="mdi:play"] {
+      transform: translateX(2px);
+    }
+    
     .card {
       display: flex;
       flex-direction: column;
@@ -229,10 +280,9 @@ export class SpotifyPremiumCard extends LitElement {
     }
 
     .icon-button {
-      width: 44px;
-      height: 44px;
-      font-size: 20px;
-      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 0;
     }
 
     .icon-button:hover {
@@ -253,8 +303,9 @@ export class SpotifyPremiumCard extends LitElement {
       border-radius: 50%;
       background: #ffffff;
       color: #111111;
-      font-size: 24px;
-      font-weight: 700;
+      display: grid;
+      place-items: center;
+      font-size: 0;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
     }
 
