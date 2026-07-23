@@ -38,7 +38,6 @@ It displays album artwork, track metadata, playback progress, and playback contr
 - Automatic volume popover hide after 10 seconds.
 - Volume fallback mute: second press on the volume icon sets volume to `0`; pressing it again restores the previous volume.
 - Inline Material Design-inspired SVG icons without external icon dependencies.
-- Creator attribution and optional project support link.
 - Responsive design for Home Assistant dashboards.
 
 ## Preview
