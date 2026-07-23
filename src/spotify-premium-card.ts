@@ -19,17 +19,20 @@ interface SpotifyPremiumCardConfig {
 @customElement('spotify-premium-card')
 export class SpotifyPremiumCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
+
   @state() private _config?: SpotifyPremiumCardConfig;
   @state() private _showVolume = false;
   @state() private _localShuffle?: boolean;
   @state() private _localRepeat?: string;
   @state() private _localMuted = false;
   @state() private _currentPosition = 0;
-
-  private _positionTimer?: number;
-  private _lastPositionUpdatedAt?: string;
+  @state() private _localVolume?: number;
 
   private _volumeTimer?: number;
+  private _positionTimer?: number;
+  private _lastPositionUpdatedAt?: string;
+  private _lastTrackKey?: string;
+  private _volumeBeforeMute = 0.5;
 
   public setConfig(config: SpotifyPremiumCardConfig): void {
     if (!config.entity) {
@@ -46,56 +49,98 @@ export class SpotifyPremiumCard extends LitElement {
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearVolumeTimer();
+
     if (this._positionTimer) {
-    window.clearInterval(this._positionTimer);
-    this._positionTimer = undefined;
+      window.clearInterval(this._positionTimer);
+      this._positionTimer = undefined;
     }
   }
 
   protected updated(): void {
-  const stateObj = this._getStateObj();
-  private _formatTime(seconds: number): string {
-    const total = Math.max(0, Math.floor(seconds || 0));
-    const minutes = Math.floor(total / 60);
-    const remainder = total % 60;
-    return `${minutes}:${String(remainder).padStart(2, '0')}`;
-  }
-    
-  if (!stateObj) return;
+    const stateObj = this._getStateObj();
 
-  const mediaPosition = Number(stateObj.attributes.media_position ?? 0);
-  const updatedAt = stateObj.attributes.media_position_updated_at;
+    if (!stateObj) {
+      return;
+    }
 
-  if (updatedAt && updatedAt !== this._lastPositionUpdatedAt) {
-    this._lastPositionUpdatedAt = updatedAt;
-    this._currentPosition = mediaPosition;
-  }
+    const trackKey = [
+      stateObj.attributes.media_content_id ?? '',
+      stateObj.attributes.media_title ?? '',
+      stateObj.attributes.media_artist ?? ''
+    ].join('|');
 
-  if (stateObj.state === 'playing' && !this._positionTimer) {
-    this._positionTimer = window.setInterval(() => {
-      const duration = Number(
-        this._getStateObj()?.attributes.media_duration ?? 0
+    if (trackKey !== this._lastTrackKey) {
+      this._lastTrackKey = trackKey;
+      this._currentPosition = Number(stateObj.attributes.media_position ?? 0);
+      this._lastPositionUpdatedAt = String(
+        stateObj.attributes.media_position_updated_at ?? ''
       );
+    }
 
-      if (duration > 0 && this._currentPosition < duration) {
-        this._currentPosition += 1;
-      }
-    }, 1000);
+    const reportedPosition = Number(stateObj.attributes.media_position ?? 0);
+    const reportedUpdatedAt = String(
+      stateObj.attributes.media_position_updated_at ?? ''
+    );
+
+    if (
+      reportedUpdatedAt &&
+      reportedUpdatedAt !== this._lastPositionUpdatedAt
+    ) {
+      this._lastPositionUpdatedAt = reportedUpdatedAt;
+      this._currentPosition = reportedPosition;
+    }
+
+    if (stateObj.state === 'playing' && !this._positionTimer) {
+      this._positionTimer = window.setInterval(() => {
+        const currentState = this._getStateObj();
+        const duration = Number(
+          currentState?.attributes.media_duration ?? 0
+        );
+
+        if (
+          currentState?.state === 'playing' &&
+          duration > 0 &&
+          this._currentPosition < duration
+        ) {
+          this._currentPosition += 1;
+        }
+      }, 1000);
+    }
+
+    if (stateObj.state !== 'playing' && this._positionTimer) {
+      window.clearInterval(this._positionTimer);
+      this._positionTimer = undefined;
+    }
   }
 
-  if (stateObj.state !== 'playing' && this._positionTimer) {
-    window.clearInterval(this._positionTimer);
-    this._positionTimer = undefined;
-  }
-}
+  private _getStateObj() {
+    if (!this.hass || !this._config) {
+      return undefined;
+    }
 
-  private _callMedia(service: string, data: Record<string, unknown> = {}): void {
-    if (!this.hass || !this._config) return;
+    return this.hass.states[this._config.entity];
+  }
+
+  private _callMedia(
+    service: string,
+    data: Record<string, unknown> = {}
+  ): void {
+    if (!this.hass || !this._config) {
+      return;
+    }
 
     this.hass.callService('media_player', service, {
       entity_id: this._config.entity,
       ...data
     });
+  }
+
+  private _formatTime(seconds: number): string {
+    const total = Math.max(0, Math.floor(seconds || 0));
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+
+    return `${minutes}:${String(remainder).padStart(2, '0')}`;
   }
 
   private _clearVolumeTimer(): void {
@@ -115,30 +160,53 @@ export class SpotifyPremiumCard extends LitElement {
 
   private _handleVolumeClick(): void {
     const stateObj = this._getStateObj();
-    if (!stateObj) return;
-  
-    if (this._showVolume) {
-      const currentVolume = Number(stateObj.attributes.volume_level ?? 0.5);
-      const nextMuted = !this._localMuted;
-  
-      this._localMuted = nextMuted;
-  
-      this._callMedia('volume_set', {
-        volume_level: nextMuted ? 0 : Math.max(currentVolume, 0.25)
-      });
-  
+
+    if (!stateObj) {
+      return;
+    }
+
+    if (!this._showVolume) {
+      this._localMuted = false;
+      this._showVolume = true;
       this._startVolumeTimer();
       return;
     }
-  
-    this._localMuted = Boolean(stateObj.attributes.is_volume_muted);
-    this._showVolume = true;
+
+    const reportedVolume = Number(stateObj.attributes.volume_level ?? 0.5);
+    const currentVolume = this._localVolume ?? reportedVolume;
+
+    if (!this._localMuted && currentVolume > 0) {
+      this._volumeBeforeMute = currentVolume;
+      this._localMuted = true;
+      this._localVolume = 0;
+
+      this._callMedia('volume_set', {
+        volume_level: 0
+      });
+    } else {
+      const restoredVolume = Math.max(this._volumeBeforeMute, 0.05);
+
+      this._localMuted = false;
+      this._localVolume = restoredVolume;
+
+      this._callMedia('volume_set', {
+        volume_level: restoredVolume
+      });
+    }
+
     this._startVolumeTimer();
   }
 
   private _handleVolumeInput(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const volume = Number(input.value) / 100;
+    const volume = Math.max(0, Math.min(1, Number(input.value) / 100));
+
+    this._localVolume = volume;
+    this._localMuted = volume === 0;
+
+    if (volume > 0) {
+      this._volumeBeforeMute = volume;
+    }
 
     this._callMedia('volume_set', {
       volume_level: volume
@@ -147,9 +215,22 @@ export class SpotifyPremiumCard extends LitElement {
     this._startVolumeTimer();
   }
 
-  private _getStateObj() {
-    if (!this.hass || !this._config) return undefined;
-    return this.hass.states[this._config.entity];
+  private _toggleShuffle(isShuffleActive: boolean): void {
+    const nextShuffle = !isShuffleActive;
+    this._localShuffle = nextShuffle;
+
+    this._callMedia('shuffle_set', {
+      shuffle: nextShuffle
+    });
+  }
+
+  private _toggleRepeat(repeatMode: string): void {
+    const nextRepeat = repeatMode === 'off' ? 'all' : 'off';
+    this._localRepeat = nextRepeat;
+
+    this._callMedia('repeat_set', {
+      repeat: nextRepeat
+    });
   }
 
   private _icon(name: string) {
@@ -209,40 +290,45 @@ export class SpotifyPremiumCard extends LitElement {
 
     const picture = stateObj.attributes.entity_picture;
     const isPlaying = stateObj.state === 'playing';
-    const isMuted =
-      this._localMuted || Boolean(stateObj.attributes.is_volume_muted);
-    
+
     const reportedShuffle = Boolean(stateObj.attributes.shuffle);
     const reportedRepeat = String(stateObj.attributes.repeat ?? 'off');
-    
+
     const isShuffleActive =
       this._localShuffle !== undefined
         ? this._localShuffle
         : reportedShuffle;
-    
+
     const repeatMode =
       this._localRepeat !== undefined
         ? this._localRepeat
         : reportedRepeat;
-    
-    const isRepeatActive = repeatMode === 'all' || repeatMode === 'one';
-    
-    const reportedVolume = Number(stateObj.attributes.volume_level ?? 0.5);
-    const volumeLevel = Math.round((isMuted ? 0 : reportedVolume) * 100);
-    
-    const duration = Number(stateObj.attributes.media_duration ?? 0);
-    const currentPosition = Math.min(
-      this._currentPosition || Number(stateObj.attributes.media_position ?? 0),
-      duration || Number.MAX_SAFE_INTEGER
-    );
-    
-    const progress =
-      duration > 0 ? Math.max(0, Math.min(100, (currentPosition / duration) * 100)) : 0;
-    
-    const isShuffleActive = Boolean(stateObj.attributes.shuffle);
+
     const isRepeatActive =
-      stateObj.attributes.repeat === 'all' ||
-      stateObj.attributes.repeat === 'one';
+      repeatMode === 'all' || repeatMode === 'one';
+
+    const reportedVolume = Number(stateObj.attributes.volume_level ?? 0.5);
+    const volume = this._localVolume ?? reportedVolume;
+
+    const isMuted =
+      this._localMuted ||
+      Boolean(stateObj.attributes.is_volume_muted) ||
+      volume === 0;
+
+    const volumeLevel = Math.round((isMuted ? 0 : volume) * 100);
+
+    const duration = Number(stateObj.attributes.media_duration ?? 0);
+    const reportedPosition = Number(stateObj.attributes.media_position ?? 0);
+
+    const currentPosition = Math.min(
+      this._currentPosition || reportedPosition,
+      duration > 0 ? duration : Number.MAX_SAFE_INTEGER
+    );
+
+    const progress =
+      duration > 0
+        ? Math.max(0, Math.min(100, (currentPosition / duration) * 100))
+        : 0;
 
     return html`
       <ha-card>
@@ -258,12 +344,18 @@ export class SpotifyPremiumCard extends LitElement {
 
           <div class="progress-row">
             <span>${this._formatTime(currentPosition)}</span>
-          
+
             <div class="progress-track">
-              <div class="progress-fill" style=${`width: ${progress}%`}></div>
-              <div class="progress-thumb" style=${`left: ${progress}%`}></div>
+              <div
+                class="progress-fill"
+                style=${`width: ${progress}%`}
+              ></div>
+              <div
+                class="progress-thumb"
+                style=${`left: ${progress}%`}
+              ></div>
             </div>
-          
+
             <span>${this._formatTime(duration)}</span>
           </div>
 
@@ -286,6 +378,7 @@ export class SpotifyPremiumCard extends LitElement {
                 ? html`
                     <div class="volume-popover">
                       <div class="volume-value">${volumeLevel}%</div>
+
                       <input
                         class="volume-slider"
                         type="range"
@@ -293,6 +386,7 @@ export class SpotifyPremiumCard extends LitElement {
                         max="100"
                         step="1"
                         .value=${String(volumeLevel)}
+                        style=${`--volume-progress: ${volumeLevel}%`}
                         @input=${this._handleVolumeInput}
                         aria-label="Nivel de volumen"
                       />
@@ -302,19 +396,17 @@ export class SpotifyPremiumCard extends LitElement {
             </div>
 
             <button
-              class=${`icon-button ${isShuffleActive ? 'is-active' : ''}`}
-              @click=${() => {
-                const nextShuffle = !isShuffleActive;
-                this._localShuffle = nextShuffle;
-                this._callMedia('shuffle_set', { shuffle: nextShuffle });
-              }}
+              class=${`icon-button ${
+                isShuffleActive ? 'is-active' : ''
+              }`}
+              @click=${() => this._toggleShuffle(isShuffleActive)}
               aria-label="Reproducción aleatoria"
             >
               ${this._icon('shuffle')}
             </button>
 
             <button
-              class=${`icon-button ${isShuffleActive ? 'is-active' : ''}`}
+              class="icon-button"
               @click=${() => this._callMedia('media_previous_track')}
               aria-label="Pista anterior"
             >
@@ -339,12 +431,10 @@ export class SpotifyPremiumCard extends LitElement {
             </button>
 
             <button
-              class=${`icon-button ${isRepeatActive ? 'is-active' : ''}`}
-              @click=${() => {
-                const nextRepeat = repeatMode === 'off' ? 'all' : 'off';
-                this._localRepeat = nextRepeat;
-                this._callMedia('repeat_set', { repeat: nextRepeat });
-              }}
+              class=${`icon-button ${
+                isRepeatActive ? 'is-active' : ''
+              }`}
+              @click=${() => this._toggleRepeat(repeatMode)}
               aria-label="Repetir"
             >
               ${this._icon('repeat')}
@@ -420,11 +510,13 @@ export class SpotifyPremiumCard extends LitElement {
       align-items: center;
       color: rgba(255, 255, 255, 0.72);
       font-size: 12px;
+      font-variant-numeric: tabular-nums;
     }
 
     .progress-track {
       position: relative;
       height: 4px;
+      overflow: visible;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.18);
     }
@@ -432,7 +524,6 @@ export class SpotifyPremiumCard extends LitElement {
     .progress-fill {
       position: absolute;
       inset: 0 auto 0 0;
-      width: 35%;
       border-radius: inherit;
       background: rgba(255, 255, 255, 0.9);
     }
@@ -440,7 +531,6 @@ export class SpotifyPremiumCard extends LitElement {
     .progress-thumb {
       position: absolute;
       top: 50%;
-      left: 35%;
       width: 12px;
       height: 12px;
       border-radius: 50%;
@@ -497,9 +587,9 @@ export class SpotifyPremiumCard extends LitElement {
       cursor: pointer;
       place-items: center;
       transition:
-        transform 0.2s ease,
-        color 0.2s ease,
-        background 0.2s ease;
+        transform 180ms ease,
+        color 180ms ease,
+        background 180ms ease;
     }
 
     .icon-button {
@@ -519,7 +609,7 @@ export class SpotifyPremiumCard extends LitElement {
     .icon-button.is-active {
       color: #1db954;
     }
-    
+
     .icon-button.is-active:hover {
       color: #1ed760;
     }
