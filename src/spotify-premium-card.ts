@@ -21,6 +21,13 @@ export class SpotifyPremiumCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @state() private _config?: SpotifyPremiumCardConfig;
   @state() private _showVolume = false;
+  @state() private _localShuffle?: boolean;
+  @state() private _localRepeat?: string;
+  @state() private _localMuted = false;
+  @state() private _currentPosition = 0;
+
+  private _positionTimer?: number;
+  private _lastPositionUpdatedAt?: string;
 
   private _volumeTimer?: number;
 
@@ -39,7 +46,48 @@ export class SpotifyPremiumCard extends LitElement {
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearVolumeTimer();
+    if (this._positionTimer) {
+    window.clearInterval(this._positionTimer);
+    this._positionTimer = undefined;
+    }
   }
+
+  protected updated(): void {
+  const stateObj = this._getStateObj();
+  private _formatTime(seconds: number): string {
+    const total = Math.max(0, Math.floor(seconds || 0));
+    const minutes = Math.floor(total / 60);
+    const remainder = total % 60;
+    return `${minutes}:${String(remainder).padStart(2, '0')}`;
+  }
+    
+  if (!stateObj) return;
+
+  const mediaPosition = Number(stateObj.attributes.media_position ?? 0);
+  const updatedAt = stateObj.attributes.media_position_updated_at;
+
+  if (updatedAt && updatedAt !== this._lastPositionUpdatedAt) {
+    this._lastPositionUpdatedAt = updatedAt;
+    this._currentPosition = mediaPosition;
+  }
+
+  if (stateObj.state === 'playing' && !this._positionTimer) {
+    this._positionTimer = window.setInterval(() => {
+      const duration = Number(
+        this._getStateObj()?.attributes.media_duration ?? 0
+      );
+
+      if (duration > 0 && this._currentPosition < duration) {
+        this._currentPosition += 1;
+      }
+    }, 1000);
+  }
+
+  if (stateObj.state !== 'playing' && this._positionTimer) {
+    window.clearInterval(this._positionTimer);
+    this._positionTimer = undefined;
+  }
+}
 
   private _callMedia(service: string, data: Record<string, unknown> = {}): void {
     if (!this.hass || !this._config) return;
@@ -68,15 +116,22 @@ export class SpotifyPremiumCard extends LitElement {
   private _handleVolumeClick(): void {
     const stateObj = this._getStateObj();
     if (!stateObj) return;
-
+  
     if (this._showVolume) {
-      this._callMedia('volume_mute', {
-        is_volume_muted: !stateObj.attributes.is_volume_muted
+      const currentVolume = Number(stateObj.attributes.volume_level ?? 0.5);
+      const nextMuted = !this._localMuted;
+  
+      this._localMuted = nextMuted;
+  
+      this._callMedia('volume_set', {
+        volume_level: nextMuted ? 0 : Math.max(currentVolume, 0.25)
       });
+  
       this._startVolumeTimer();
       return;
     }
-
+  
+    this._localMuted = Boolean(stateObj.attributes.is_volume_muted);
     this._showVolume = true;
     this._startVolumeTimer();
   }
@@ -154,14 +209,40 @@ export class SpotifyPremiumCard extends LitElement {
 
     const picture = stateObj.attributes.entity_picture;
     const isPlaying = stateObj.state === 'playing';
-    const isMuted = Boolean(stateObj.attributes.is_volume_muted);
+    const isMuted =
+      this._localMuted || Boolean(stateObj.attributes.is_volume_muted);
+    
+    const reportedShuffle = Boolean(stateObj.attributes.shuffle);
+    const reportedRepeat = String(stateObj.attributes.repeat ?? 'off');
+    
+    const isShuffleActive =
+      this._localShuffle !== undefined
+        ? this._localShuffle
+        : reportedShuffle;
+    
+    const repeatMode =
+      this._localRepeat !== undefined
+        ? this._localRepeat
+        : reportedRepeat;
+    
+    const isRepeatActive = repeatMode === 'all' || repeatMode === 'one';
+    
+    const reportedVolume = Number(stateObj.attributes.volume_level ?? 0.5);
+    const volumeLevel = Math.round((isMuted ? 0 : reportedVolume) * 100);
+    
+    const duration = Number(stateObj.attributes.media_duration ?? 0);
+    const currentPosition = Math.min(
+      this._currentPosition || Number(stateObj.attributes.media_position ?? 0),
+      duration || Number.MAX_SAFE_INTEGER
+    );
+    
+    const progress =
+      duration > 0 ? Math.max(0, Math.min(100, (currentPosition / duration) * 100)) : 0;
+    
     const isShuffleActive = Boolean(stateObj.attributes.shuffle);
     const isRepeatActive =
       stateObj.attributes.repeat === 'all' ||
       stateObj.attributes.repeat === 'one';
-    const volumeLevel = Math.round(
-      Number(stateObj.attributes.volume_level ?? 0.5) * 100
-    );
 
     return html`
       <ha-card>
@@ -176,12 +257,14 @@ export class SpotifyPremiumCard extends LitElement {
           </div>
 
           <div class="progress-row">
-            <span>0:53</span>
+            <span>${this._formatTime(currentPosition)}</span>
+          
             <div class="progress-track">
-              <div class="progress-fill"></div>
-              <div class="progress-thumb"></div>
+              <div class="progress-fill" style=${`width: ${progress}%`}></div>
+              <div class="progress-thumb" style=${`left: ${progress}%`}></div>
             </div>
-            <span>2:17</span>
+          
+            <span>${this._formatTime(duration)}</span>
           </div>
 
           <div class="meta">
@@ -219,11 +302,12 @@ export class SpotifyPremiumCard extends LitElement {
             </div>
 
             <button
-              class="icon-button"
-              @click=${() =>
-                this._callMedia('shuffle_set', {
-                  shuffle: !stateObj.attributes.shuffle
-                })}
+              class=${`icon-button ${isShuffleActive ? 'is-active' : ''}`}
+              @click=${() => {
+                const nextShuffle = !isShuffleActive;
+                this._localShuffle = nextShuffle;
+                this._callMedia('shuffle_set', { shuffle: nextShuffle });
+              }}
               aria-label="Reproducción aleatoria"
             >
               ${this._icon('shuffle')}
@@ -256,10 +340,11 @@ export class SpotifyPremiumCard extends LitElement {
 
             <button
               class=${`icon-button ${isRepeatActive ? 'is-active' : ''}`}
-              @click=${() =>
-                this._callMedia('repeat_set', {
-                  repeat: stateObj.attributes.repeat === 'off' ? 'all' : 'off'
-                })}
+              @click=${() => {
+                const nextRepeat = repeatMode === 'off' ? 'all' : 'off';
+                this._localRepeat = nextRepeat;
+                this._callMedia('repeat_set', { repeat: nextRepeat });
+              }}
               aria-label="Repetir"
             >
               ${this._icon('repeat')}
