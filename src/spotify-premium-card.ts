@@ -106,7 +106,7 @@ export class SpotifyPremiumCard extends LitElement {
       shuffle:
         'M10.59,9.17L5.41,4L4,5.41L9.17,10.59L10.59,9.17M14.5,4L16.54,6.04L4,18.59L5.41,20L17.96,7.46L20,9.5V4H14.5M14.83,14.83L13.42,16.24L16.55,19.37L14.5,21.41H20V15.91L17.96,17.96L14.83,14.83Z',
       previous:
-        'M6,6V18L14.5,12L6,6M16,6V18H18V6H16Z',
+        'M18,6V18L9.5,12L18,6M6,6V18H8V6H6Z',
       play:
         'M8,5.14V18.86C8,19.65 8.87,20.13 9.54,19.71L20.31,12.85C20.93,12.45 20.93,11.55 20.31,11.15L9.54,4.29C8.87,3.87 8,4.35 8,5.14Z',
       pause:
@@ -155,6 +155,10 @@ export class SpotifyPremiumCard extends LitElement {
     const picture = stateObj.attributes.entity_picture;
     const isPlaying = stateObj.state === 'playing';
     const isMuted = Boolean(stateObj.attributes.is_volume_muted);
+    const isShuffleActive = Boolean(stateObj.attributes.shuffle);
+    const isRepeatActive =
+      stateObj.attributes.repeat === 'all' ||
+      stateObj.attributes.repeat === 'one';
     const volumeLevel = Math.round(
       Number(stateObj.attributes.volume_level ?? 0.5) * 100
     );
@@ -226,7 +230,7 @@ export class SpotifyPremiumCard extends LitElement {
             </button>
 
             <button
-              class="icon-button"
+              class=${`icon-button ${isShuffleActive ? 'is-active' : ''}`}
               @click=${() => this._callMedia('media_previous_track')}
               aria-label="Pista anterior"
             >
@@ -251,7 +255,7 @@ export class SpotifyPremiumCard extends LitElement {
             </button>
 
             <button
-              class="icon-button"
+              class=${`icon-button ${isRepeatActive ? 'is-active' : ''}`}
               @click=${() =>
                 this._callMedia('repeat_set', {
                   repeat: stateObj.attributes.repeat === 'off' ? 'all' : 'off'
@@ -425,6 +429,14 @@ export class SpotifyPremiumCard extends LitElement {
     .icon-button:hover {
       color: #fff;
       transform: scale(1.08);
+    }
+
+    .icon-button.is-active {
+      color: #1db954;
+    }
+    
+    .icon-button.is-active:hover {
+      color: #1ed760;
     }
 
     .icon-button:active,
