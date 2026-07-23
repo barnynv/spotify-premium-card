@@ -10,7 +10,7 @@ Created and maintained by **Barny_II**.
 
 > This project is independent and is not affiliated with, endorsed by, or sponsored by Spotify AB.
 
-![Spotify Premium Card preview](img/spotify-premium-card.png)
+![Spotify Premium Card preview](images/spotify-premium-card-preview.png)
 
 ## Overview
 
@@ -44,7 +44,7 @@ It displays album artwork, track metadata, playback progress, and playback contr
 
 The screenshot below shows the current interface and control layout.
 
-![Spotify Premium Card in Home Assistant](img/spotify-premium-card.png)
+![Spotify Premium Card in Home Assistant](images/spotify-premium-card-preview.png)
 
 ## Requirements
 
