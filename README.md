@@ -67,7 +67,7 @@ Until the card is included in the default HACS repository list:
 4. Add:
 
    ```text
-   https://github.com/TU_USUARIO_GITHUB/spotify-premium-card
+   https://github.com/barnynv/spotify-premium-card
    ```
 
 5. Select the category **Dashboard**.
