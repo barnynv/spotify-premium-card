@@ -20,6 +20,9 @@ interface SpotifyPremiumCardConfig {
 export class SpotifyPremiumCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @state() private _config?: SpotifyPremiumCardConfig;
+  @state() private _showVolume = false;
+
+  private _volumeTimer?: number;
 
   public setConfig(config: SpotifyPremiumCardConfig): void {
     if (!config.entity) {
@@ -33,6 +36,11 @@ export class SpotifyPremiumCard extends LitElement {
     return 6;
   }
 
+  public disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._clearVolumeTimer();
+  }
+
   private _callMedia(service: string, data: Record<string, unknown> = {}): void {
     if (!this.hass || !this._config) return;
 
@@ -42,10 +50,59 @@ export class SpotifyPremiumCard extends LitElement {
     });
   }
 
+  private _clearVolumeTimer(): void {
+    if (this._volumeTimer) {
+      window.clearTimeout(this._volumeTimer);
+      this._volumeTimer = undefined;
+    }
+  }
+
+  private _startVolumeTimer(): void {
+    this._clearVolumeTimer();
+
+    this._volumeTimer = window.setTimeout(() => {
+      this._showVolume = false;
+    }, 10000);
+  }
+
+  private _handleVolumeClick(): void {
+    const stateObj = this._getStateObj();
+    if (!stateObj) return;
+
+    if (this._showVolume) {
+      this._callMedia('volume_mute', {
+        is_volume_muted: !stateObj.attributes.is_volume_muted
+      });
+      this._startVolumeTimer();
+      return;
+    }
+
+    this._showVolume = true;
+    this._startVolumeTimer();
+  }
+
+  private _handleVolumeInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const volume = Number(input.value) / 100;
+
+    this._callMedia('volume_set', {
+      volume_level: volume
+    });
+
+    this._startVolumeTimer();
+  }
+
+  private _getStateObj() {
+    if (!this.hass || !this._config) return undefined;
+    return this.hass.states[this._config.entity];
+  }
+
   private _icon(name: string) {
     const paths: Record<string, string> = {
       volume:
         'M3,9V15H7L12,20V4L7,9H3M14.5,12C14.5,10.23 13.5,8.71 12,8V16C13.5,15.29 14.5,13.77 14.5,12M12,3.23V5.29C14.89,6.15 17,8.83 17,12C17,15.17 14.89,17.85 12,18.71V20.77C16,19.86 19,16.28 19,12C19,7.72 16,4.14 12,3.23Z',
+      muted:
+        'M3,9V15H7L12,20V4L7,9H3M16.59,12L19,9.59L20.41,11L18,13.41L20.41,15.83L19,17.24L16.59,14.83L14.17,17.24L12.76,15.83L15.17,13.41L12.76,11L14.17,9.59L16.59,12Z',
       shuffle:
         'M10.59,9.17L5.41,4L4,5.41L9.17,10.59L10.59,9.17M14.5,4L16.54,6.04L4,18.59L5.41,20L17.96,7.46L20,9.5V4H14.5M14.83,14.83L13.42,16.24L16.55,19.37L14.5,21.41H20V15.91L17.96,17.96L14.83,14.83Z',
       previous:
@@ -74,7 +131,7 @@ export class SpotifyPremiumCard extends LitElement {
       return nothing;
     }
 
-    const stateObj = this.hass.states[this._config.entity];
+    const stateObj = this._getStateObj();
 
     if (!stateObj) {
       return html`
@@ -97,6 +154,10 @@ export class SpotifyPremiumCard extends LitElement {
 
     const picture = stateObj.attributes.entity_picture;
     const isPlaying = stateObj.state === 'playing';
+    const isMuted = Boolean(stateObj.attributes.is_volume_muted);
+    const volumeLevel = Math.round(
+      Number(stateObj.attributes.volume_level ?? 0.5) * 100
+    );
 
     return html`
       <ha-card>
@@ -124,14 +185,34 @@ export class SpotifyPremiumCard extends LitElement {
             <div class="artist" title=${artist}>${artist}</div>
           </div>
 
-          <div class="controls-grid">
-            <button
-              class="icon-button"
-              @click=${() => this._callMedia('volume_down')}
-              aria-label="Bajar volumen"
-            >
-              ${this._icon('volume')}
-            </button>
+          <div class="controls-row">
+            <div class="volume-control">
+              <button
+                class="icon-button"
+                @click=${this._handleVolumeClick}
+                aria-label=${isMuted ? 'Activar sonido' : 'Control de volumen'}
+              >
+                ${this._icon(isMuted ? 'muted' : 'volume')}
+              </button>
+
+              ${this._showVolume
+                ? html`
+                    <div class="volume-popover">
+                      <div class="volume-value">${volumeLevel}%</div>
+                      <input
+                        class="volume-slider"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        .value=${String(volumeLevel)}
+                        @input=${this._handleVolumeInput}
+                        aria-label="Nivel de volumen"
+                      />
+                    </div>
+                  `
+                : nothing}
+            </div>
 
             <button
               class="icon-button"
@@ -152,16 +233,14 @@ export class SpotifyPremiumCard extends LitElement {
               ${this._icon('previous')}
             </button>
 
-            <div class="center-wrap">
-              <button
-                class="play-button"
-                @click=${() =>
-                  this._callMedia(isPlaying ? 'media_pause' : 'media_play')}
-                aria-label=${isPlaying ? 'Pausar' : 'Reproducir'}
-              >
-                ${this._icon(isPlaying ? 'pause' : 'play')}
-              </button>
-            </div>
+            <button
+              class="play-button"
+              @click=${() =>
+                this._callMedia(isPlaying ? 'media_pause' : 'media_play')}
+              aria-label=${isPlaying ? 'Pausar' : 'Reproducir'}
+            >
+              ${this._icon(isPlaying ? 'pause' : 'play')}
+            </button>
 
             <button
               class="icon-button"
@@ -200,7 +279,7 @@ export class SpotifyPremiumCard extends LitElement {
     }
 
     ha-card {
-      overflow: hidden;
+      overflow: visible;
       border-radius: 24px;
       background: #121212;
       color: #fff;
@@ -304,13 +383,22 @@ export class SpotifyPremiumCard extends LitElement {
       white-space: nowrap;
     }
 
-    .controls-grid {
+    .controls-row {
       display: flex;
       width: 100%;
+      min-width: 0;
+      gap: 2px;
       align-items: center;
       justify-content: space-between;
-      gap: 4px;
       padding-top: 8px;
+    }
+
+    .volume-control {
+      position: relative;
+      display: flex;
+      flex: 1 1 0;
+      min-width: 0;
+      justify-content: center;
     }
 
     .icon-button,
@@ -326,18 +414,17 @@ export class SpotifyPremiumCard extends LitElement {
     }
 
     .icon-button {
-      width: 36px;
-      height: 36px;
+      flex: 1 1 0;
+      min-width: 30px;
+      height: 38px;
       border-radius: 50%;
       background: transparent;
-      color: #9f9f9f;
-      flex: 1 1 0;
-      min-width: 40px;
+      color: #a7a7a7;
     }
 
     .icon-button:hover {
-      color: #d7d7d7;
-      transform: scale(1.06);
+      color: #fff;
+      transform: scale(1.08);
     }
 
     .icon-button:active,
@@ -345,21 +432,15 @@ export class SpotifyPremiumCard extends LitElement {
       transform: scale(0.95);
     }
 
-    .center-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-inline: 4px;
-    }
-
     .play-button {
-      width: 64px;
-      height: 64px;
+      flex: 0 0 58px;
+      width: 58px;
+      height: 58px;
+      margin-inline: 2px;
       border-radius: 50%;
       background: #fff;
       color: #111;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-      flex: 0 0 auto;
     }
 
     .play-button:hover {
@@ -369,19 +450,116 @@ export class SpotifyPremiumCard extends LitElement {
     .icon-button svg,
     .play-button svg {
       display: block;
-      width: 22px;
-      height: 22px;
+      width: 21px;
+      height: 21px;
       fill: currentColor;
     }
 
     .play-button svg {
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
+    }
+
+    .volume-popover {
+      position: absolute;
+      z-index: 10;
+      bottom: calc(100% + 12px);
+      left: 50%;
+      display: flex;
+      width: 54px;
+      height: 182px;
+      padding: 10px 8px;
+      transform: translateX(-50%);
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      background: rgba(30, 30, 30, 0.98);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.42);
+    }
+
+    .volume-value {
+      position: absolute;
+      top: 9px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .volume-slider {
+      width: 132px;
+      height: 22px;
+      margin-top: 24px;
+      cursor: pointer;
+      accent-color: #1db954;
+      transform: rotate(-90deg);
+    }
+
+    .volume-slider::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(
+        to right,
+        #1db954 0%,
+        #1db954 var(--volume-progress, 50%),
+        rgba(255, 255, 255, 0.2) var(--volume-progress, 50%),
+        rgba(255, 255, 255, 0.2) 100%
+      );
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      width: 14px;
+      height: 14px;
+      margin-top: -5px;
+      border: none;
+      border-radius: 50%;
+      appearance: none;
+      background: #fff;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+    }
+
+    .volume-slider::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .volume-slider::-moz-range-progress {
+      height: 4px;
+      border-radius: 999px;
+      background: #1db954;
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border: none;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
     }
 
     .error {
       padding: 16px;
       color: #fff;
+    }
+
+    @media (max-width: 360px) {
+      .icon-button {
+        min-width: 26px;
+        height: 34px;
+      }
+
+      .icon-button svg {
+        width: 19px;
+        height: 19px;
+      }
+
+      .play-button {
+        flex-basis: 52px;
+        width: 52px;
+        height: 52px;
+      }
     }
   `;
 }
