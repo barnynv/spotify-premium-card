@@ -2,6 +2,8 @@
 
 A premium Spotify-inspired media player card for Home Assistant with dynamic artwork, blur effects, smooth animations, adaptive themes and full HACS support.
 
+Created and maintained by [Barny_II](https://github.com/barnynv).
+
 ## Status
 
 Early development version. The first goal is to provide a solid HACS-compatible base with a polished media player layout.
@@ -55,10 +57,12 @@ npm run build
 ## Roadmap
 
 - V0.1 Base card and HACS setup
-- V0.2 Improved controls layout
-- V0.3 Dynamic artwork colors
-- V0.4 Popup and extra actions
-- V0.5 Adaptive themes by player type
+
+## Support the project
+
+If this card is useful to you and you would like to support its development:
+
+[Support the project on Revolut](https://revolut.me/ricardspw1)
 
 ## License
 
