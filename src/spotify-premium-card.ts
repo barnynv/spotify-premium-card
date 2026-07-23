@@ -396,19 +396,6 @@ export class SpotifyPremiumCard extends LitElement {
                 : nothing}
             </div>
 
-            <div class="footer">
-              <span>Created by Barny_II</span>
-            
-              <a
-                href="https://revolut.me/ricardspw1"
-                target="_blank"
-                rel="noopener noreferrer"
-                @click=${(event: Event) => event.stopPropagation()}
-              >
-                Support the project
-              </a>
-            </div>
-
             <button
               class=${`icon-button ${
                 isShuffleActive ? 'is-active' : ''
@@ -460,6 +447,18 @@ export class SpotifyPremiumCard extends LitElement {
             >
               ${this._icon('cast')}
             </button>
+          </div>
+          <div class="footer">
+              <span>Created by Barny_II</span>
+            
+              <a
+                href="https://revolut.me/ricardspw1"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click=${(event: Event) => event.stopPropagation()}
+              >
+                Support the project
+              </a>
           </div>
         </div>
       </ha-card>
