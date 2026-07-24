@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/barnynv/spotify-premium-card/main/images/spc-logo-transparent-512.png" width="128" alt="Spotify Premium Card logo">
-</p> # Spotify Premium Card
+</p> ## Spotify Premium Card
 
 A premium Spotify-inspired media player card for Home Assistant.
 
