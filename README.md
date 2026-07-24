@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/barnynv/spotify-premium-card/main/images/logo.png" width="128" alt="Spotify Premium Card logo">
+  <img src="https://raw.githubusercontent.com/barnynv/spotify-premium-card/main/images/logo-spotify-premium-card.png" width="128" alt="Spotify Premium Card logo">
 </p>
 
 # Spotify Premium Card
