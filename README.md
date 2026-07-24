@@ -1,4 +1,4 @@
-![Spotify Premium Card preview](images/spc-logo-transparent-512.png) 
+
 ## Spotify Premium Card
 
 A premium Spotify-inspired media player card for Home Assistant.
