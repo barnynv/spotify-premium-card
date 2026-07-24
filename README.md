@@ -4,8 +4,6 @@
 
 # Spotify Premium Card
 
-# Spotify Premium Card
-
 A premium Spotify-inspired media player card for Home Assistant.
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://www.hacs.xyz/)
